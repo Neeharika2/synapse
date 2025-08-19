@@ -1,0 +1,158 @@
+// Fix for projects.js
+// Only showing the fixed section for accepting/rejecting join requests
+
+// Accept or reject a join request
+router.post('/:projectId/requests/:requestId/:action', authMiddleware, async (req, res) => {
+  let connection;
+  try {
+    const { projectId, requestId, action } = req.params;
+    const userId = req.userId;
+    
+    console.log(`🔹 Processing join request ${requestId} for project ${projectId}, action: ${action}, by user ${userId}`);
+    
+    if (action !== 'accept' && action !== 'reject') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid action. Use "accept" or "reject"'
+      });
+    }
+
+    // Get a connection from the pool for transaction
+    connection = await pool.getConnection();
+    
+    // Check if user is the project owner
+    const [projectRows] = await connection.execute(
+      'SELECT creator_id FROM projects WHERE id = ?',
+      [projectId]
+    );
+    
+    if (projectRows.length === 0) {
+      await connection.release();
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+    }
+    
+    console.log(`🔹 Project creator id: ${projectRows[0].creator_id}, Current user id: ${userId}`);
+    
+    if (projectRows[0].creator_id.toString() !== userId.toString()) {
+      await connection.release();
+      return res.status(403).json({
+        success: false,
+        error: 'Only the project creator can manage join requests'
+      });
+    }
+    
+    // Get the request details
+    console.log(`🔹 Looking for join request with ID ${requestId} in project ${projectId}`);
+    const [requestRows] = await connection.execute(
+      'SELECT * FROM join_requests WHERE id = ? AND project_id = ? AND status = "pending"',
+      [requestId, projectId]
+    );
+    
+    console.log(`🔹 Found ${requestRows.length} matching join requests`);
+    
+    if (requestRows.length === 0) {
+      await connection.release();
+      return res.status(404).json({
+        success: false,
+        error: 'Join request not found or already processed'
+      });
+    }
+    
+    const joinRequest = requestRows[0];
+    console.log(`🔹 Processing join request from user ${joinRequest.user_id}`);
+    
+    // Begin transaction
+    await connection.beginTransaction();
+    
+    // Update request status
+    await connection.execute(
+      'UPDATE join_requests SET status = ? WHERE id = ?',
+      [action === 'accept' ? 'accepted' : 'rejected', requestId]
+    );
+    
+    // If accepting, add user to project members
+    if (action === 'accept') {
+      // Check if user is already a member (rare edge case)
+      const [existingMember] = await connection.execute(
+        'SELECT id FROM project_members WHERE project_id = ? AND user_id = ?',
+        [projectId, joinRequest.user_id]
+      );
+      
+      console.log(`🔹 User already a member? ${existingMember.length > 0 ? 'Yes' : 'No'}`);
+      
+      if (existingMember.length === 0) {
+        await connection.execute(
+          'INSERT INTO project_members (project_id, user_id, role, status) VALUES (?, ?, "member", "accepted")',
+          [projectId, joinRequest.user_id]
+        );
+        
+        // Update project's current_members count
+        await connection.execute(
+          'UPDATE projects SET current_members = current_members + 1 WHERE id = ?',
+          [projectId]
+        );
+      }
+    }
+    
+    // Commit transaction
+    await connection.commit();
+    
+    // Get updated project data to return
+    const [projectData] = await connection.execute(`
+      SELECT 
+        p.*,
+        u.name as creator_name,
+        u.email as creator_email
+      FROM projects p
+      JOIN users u ON p.creator_id = u.id
+      WHERE p.id = ?
+    `, [projectId]);
+    
+    if (projectData.length > 0) {
+      // Parse required skills
+      if (projectData[0].required_skills) {
+        try {
+          projectData[0].required_skills = JSON.parse(projectData[0].required_skills);
+        } catch (e) {
+          projectData[0].required_skills = [];
+        }
+      }
+    }
+    
+    console.log(`✅ Successfully ${action}ed join request ${requestId}`);
+    
+    res.json({
+      success: true,
+      message: action === 'accept' ? 'User added to the project' : 'Request rejected',
+      project: projectData.length > 0 ? projectData[0] : null
+    });
+  } catch (error) {
+    console.error(`❌ Error ${req.params.action}ing join request:`, error);
+    
+    // Rollback transaction on error
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error('Error during rollback:', rollbackError);
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: `Failed to ${req.params.action} join request: ${error.message}`
+    });
+  } finally {
+    // Always release the connection
+    if (connection) {
+      try {
+        await connection.release();
+      } catch (releaseError) {
+        console.error('Error releasing connection:', releaseError);
+      }
+    }
+  }
+});

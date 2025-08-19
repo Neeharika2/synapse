@@ -3,11 +3,11 @@ require('dotenv').config();
 
 // Create connection pool for better performance
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'synapse_db',
+  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -26,7 +26,10 @@ const testConnection = async () => {
     connection.release();
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    process.exit(1);
+    console.log('💡 Please make sure MySQL is running and the database exists');
+    console.log('💡 You can create the database with: CREATE DATABASE synapse;');
+    // Don't exit, just log the error
+    console.log('⚠️  Server will start but database features may not work');
   }
 };
 
@@ -150,12 +153,84 @@ const initializeTables = async () => {
       )
     `);
 
-    console.log('✅ Database tables initialized successfully');
+    // Create project_todos table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS project_todos (
+        id VARCHAR(36) PRIMARY KEY,
+        project_id VARCHAR(36) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+        status ENUM('pending', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending',
+        due_date DATE,
+        assigned_to VARCHAR(36),
+        created_by VARCHAR(36) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_project_todos_project (project_id),
+        INDEX idx_project_todos_assigned (assigned_to),
+        INDEX idx_project_todos_status (status)
+      )
+    `);
+
+    // Create project_files table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS project_files (
+        id VARCHAR(36) PRIMARY KEY,
+        project_id VARCHAR(36) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_size BIGINT,
+        file_type VARCHAR(100),
+        uploaded_by VARCHAR(36) NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_project_files_project (project_id),
+        INDEX idx_project_files_uploaded_by (uploaded_by)
+      )
+    `);
+
+    // Create project_meetings table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS project_meetings (
+        id VARCHAR(36) PRIMARY KEY,
+        project_id VARCHAR(36) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        meeting_date DATE NOT NULL,
+        meeting_time TIME NOT NULL,
+        duration INT DEFAULT 60,
+        platform VARCHAR(100),
+        meeting_url TEXT,
+        created_by VARCHAR(36) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_project_meetings_project (project_id),
+        INDEX idx_project_meetings_date (meeting_date),
+        INDEX idx_project_meetings_created_by (created_by)
+      )
+    `);
+
+    // Create project_chat table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS project_chat (
+        id VARCHAR(36) PRIMARY KEY,
+        project_id VARCHAR(36) NOT NULL,
+        user_id VARCHAR(36) NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_project_chat_project (project_id),
+        INDEX idx_project_chat_user (user_id),
+        INDEX idx_project_chat_created (created_at)
+      )
+    `);
+
+    console.log('✅ All tables created successfully');
     connection.release();
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize database tables:', error);
-    throw error;
+    console.log('⚠️  Server will start but database features may not work');
+    return false;
   }
 };
 

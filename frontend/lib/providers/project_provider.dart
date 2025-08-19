@@ -126,10 +126,8 @@ class ProjectProvider with ChangeNotifier {
       if (response['success'] && response['data'] != null) {
         final projectData = response['data'];
 
-        // Add pending requests to the project data
-        if (projectData['pending_requests'] != null) {
-          projectData['pending_requests'] = projectData['pending_requests'];
-        } else {
+        // Ensure pending_requests is properly initialized
+        if (projectData['pending_requests'] == null) {
           projectData['pending_requests'] = [];
         }
 

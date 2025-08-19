@@ -8,10 +8,11 @@ import 'screens/auth/register_screen.dart';
 import 'screens/profile/profile_setup_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/project/project_dashboard_screen.dart';
-import 'screens/team/team_dashboard_screen.dart';
+import 'screens/teams/teams_screen.dart';
 import 'screens/project/create_project_screen.dart';
 
 void main() {
+  print('🚀 Starting Synapse App'); // Debug print
   runApp(const SynapseApp());
 }
 
@@ -83,8 +84,21 @@ class SynapseApp extends StatelessWidget {
           '/profile-setup': (context) => const ProfileSetupScreen(),
           '/home': (context) => const HomeScreen(),
           '/project': (context) => const ProjectDashboardScreen(),
-          '/teams': (context) => const HomeScreen(initialTab: 2),
+          '/teams': (context) {
+            print('📱 Navigating to TeamsScreen'); // Debug print
+            return const TeamsScreen();
+          },
           '/create-project': (context) => const CreateProjectScreen(),
+        },
+        // Add this to handle unknown routes and debug navigation issues
+        onUnknownRoute: (settings) {
+          print('❌ Unknown route: ${settings.name}');
+          return MaterialPageRoute(
+            builder:
+                (context) => const Scaffold(
+                  body: Center(child: Text('Route not found')),
+                ),
+          );
         },
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../teams/teams_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialTab;
@@ -16,20 +17,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _searchController = TextEditingController();
   List<dynamic> _projects = [];
   List<dynamic> _myProjects = [];
-  List<dynamic> _myTeams = []; // Teams I created
-  List<dynamic> _joinedTeams = []; // Teams I joined but didn't create
   bool _isLoading = false;
   String? _errorMessage;
-  late TabController _teamTabController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab;
-    _teamTabController = TabController(length: 2, vsync: this);
     _loadProjects();
     _loadMyProjects();
-    _loadTeams();
   }
 
   Future<void> _loadProjects() async {
@@ -75,28 +71,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _loadTeams() async {
-    try {
-      // Load teams I created
-      final myTeamsResponse = await ApiService.getProjects(status: 'my_projects');
-      if (myTeamsResponse['success']) {
-        setState(() {
-          _myTeams = myTeamsResponse['data'] ?? [];
-        });
-      }
-
-      // Load teams I joined (but didn't create)
-      final joinedTeamsResponse = await ApiService.getProjects(status: 'joined_projects');
-      if (joinedTeamsResponse['success']) {
-        setState(() {
-          _joinedTeams = joinedTeamsResponse['data'] ?? [];
-        });
-      }
-    } catch (e) {
-      print('Failed to load teams: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -105,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           _buildDiscoveryTab(),
           _buildMyProjectsTab(),
-          _buildTeamsTab(),
+          const TeamsScreen(), // Using TeamsScreen component
           _buildProfileTab(),
         ],
       ),
@@ -139,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ],
       ),
       floatingActionButton:
-          _currentIndex == 0 || _currentIndex == 2
+          _currentIndex == 0 || _currentIndex == 1
               ? FloatingActionButton(
                 onPressed: _showPostIdeaDialog,
                 backgroundColor: const Color(0xFF6366F1),
@@ -182,10 +156,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         children: [
                           const Text(
                             'Welcome back!',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 14),
                           ),
                           Text(
                             displayName,
@@ -256,13 +227,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       itemCount: _projects.length,
                       itemBuilder: (context, index) {
                         final project = _projects[index];
-                        return _buildProjectCard(
-                          project['title'] ?? 'Untitled Project',
-                          project['description'] ?? 'No description',
-                          List<String>.from(project['required_skills'] ?? []),
-                          _formatDate(project['created_at']),
-                          '${project['current_members']}/${project['max_members']} members',
-                        );
+                        return _buildProjectCard(project);
                       },
                     ),
           ),
@@ -350,621 +315,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTeamsTab() {
-    return SafeArea(
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6366F1),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Team Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TabBar(
-                  controller: _teamTabController,
-                  indicatorColor: Colors.white,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  tabs: const [
-                    Tab(text: 'My Teams'),
-                    Tab(text: 'Joined Teams'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Teams content
-          Expanded(
-            child: TabBarView(
-              controller: _teamTabController,
-              children: [
-                _buildMyTeamsContent(),
-                _buildJoinedTeamsContent(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMyTeamsContent() {
-    if (_myTeams.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.group_work, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            const Text('No teams created yet'),
-            const SizedBox(height: 8),
-            const Text(
-              'Create a project to start a new team',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _showPostIdeaDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Team'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadTeams,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _myTeams.length,
-        itemBuilder: (context, index) {
-          final team = _myTeams[index];
-          return _buildTeamCard(
-            team,
-            isCreator: true,
-            onTap: () => _navigateToTeamDetails(team['id']),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTeamCard(
-    Map<String, dynamic> team, {
-    required bool isCreator,
-    required VoidCallback onTap,
-  }) {
-    final memberCount = '${team['current_members']}/${team['max_members']}';
-    final status = team['status'] ?? 'open';
-    final statusColor = _getStatusColor(status);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      team['title'] ?? 'Untitled Project',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                team['description'] ?? 'No description',
-                style: const TextStyle(color: Colors.grey),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  // Members indicator
-                  Row(
-                    children: [
-                      const Icon(Icons.people, size: 16, color: Colors.blue),
-                      const SizedBox(width: 4),
-                      Text(memberCount, style: const TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Created date
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(team['created_at']),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const Spacer(),
-
-                  // Action button
-                  isCreator
-                      ? const Chip(
-                        label: Text('Owner'),
-                        backgroundColor: Color(0xFFE0F2F1),
-                        labelStyle: TextStyle(color: Colors.teal, fontSize: 12),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      )
-                      : const Chip(
-                        label: Text('Member'),
-                        backgroundColor: Color(0xFFE8EAF6),
-                        labelStyle: TextStyle(
-                          color: Colors.indigo,
-                          fontSize: 12,
-                        ),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _navigateToTeamDetails(String projectId) {
-    Navigator.pushNamed(context, '/project', arguments: projectId);
-  }
-
-  Widget _buildProjectCard(
-    String title,
-    String description,
-    List<String> skills,
-    String timeAgo,
-    String members,
-  ) {
-    // Find the project in the list
-    final project = _projects.firstWhere(
-      (p) => p['title'] == title,
-      orElse: () => {'id': '', 'creator_id': ''},
-    );
-    
-    // Check if current user is the creator
-    final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?['id']?.toString();
-    final isCreator = project['creator_id']?.toString() == currentUserId;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-                Icon(Icons.bookmark_outline, color: Colors.grey[400]),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: const TextStyle(color: Color(0xFF6B7280), height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children:
-                  skills
-                      .map(
-                        (skill) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6366F1).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            skill,
-                            style: const TextStyle(
-                              color: Color(0xFF6366F1),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.group_outlined, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  members,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-                const Spacer(),
-                Text(
-                  timeAgo,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-                const SizedBox(width: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Only show join button if not the creator
-                    if (!isCreator)
-                      OutlinedButton(
-                        onPressed: () => _showJoinRequestDialog(project),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF6366F1),
-                          side: const BorderSide(color: Color(0xFF6366F1)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: const Text('Request to Join'),
-                      ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => Navigator.pushNamed(
-                        context,
-                        '/project',
-                        arguments: project['id'],
-                      ),
-                      child: isCreator 
-                        ? const Text('Manage') 
-                        : const Text('View Details'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showJoinRequestDialog(Map<String, dynamic> project) {
-    final messageController = TextEditingController();
-    bool isLoading = false;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Join ${project['title']}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Send a request to join this project. You can include a message to the project owner.',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: messageController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Message (Optional)',
-                  hintText: 'Describe why you want to join this project...',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      setState(() => isLoading = true);
-                      
-                      try {
-                        final response = await ApiService.joinProject(
-                          project['id'].toString(),
-                          message: messageController.text.trim(),
-                        );
-                        
-                        Navigator.pop(context);
-                        
-                        if (response['success']) {
-                          _showSnackBar(
-                            'Join request sent successfully!',
-                            Colors.green,
-                          );
-                          // reload sent requests if you track them
-                        } else {
-                          _showSnackBar(
-                            response['error'] ?? 'Failed to send join request',
-                            Colors.red,
-                          );
-                        }
-                      } catch (e) {
-                        Navigator.pop(context);
-                        _showSnackBar('Error: $e', Colors.red);
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Send Request'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMyProjectCard(Map<String, dynamic> project) {
-    String status = project['status'] ?? 'open';
-    Color statusColor = _getStatusColor(status);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    project['title'] ?? 'Untitled Project',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              project['description'] ?? 'No description',
-              style: const TextStyle(color: Color(0xFF6B7280), height: 1.4),
-            ),
-            const SizedBox(height: 12),
-
-            // Show required skills for my projects too
-            if (project['required_skills'] != null &&
-                project['required_skills'].isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children:
-                      (project['required_skills'] as List<dynamic>)
-                          .map(
-                            (skill) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF6366F1).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                skill.toString(),
-                                style: const TextStyle(
-                                  color: Color(0xFF6366F1),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                ),
-              ),
-
-            Row(
-              children: [
-                Icon(Icons.group_outlined, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  '${project['current_members']}/${project['max_members']} members',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-                const Spacer(),
-                Text(
-                  _formatDate(project['created_at']),
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-                const SizedBox(width: 12),
-
-                // Show different buttons based on user role
-                _buildProjectActionButton(project),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProjectActionButton(Map<String, dynamic> project) {
-    // Determine user's role in this project
-    final currentUserId =
-        Provider.of<AuthProvider>(
-          context,
-          listen: false,
-        ).user?['id']?.toString();
-    final creatorId = project['creator_id']?.toString();
-    final isCreator = currentUserId == creatorId;
-
-    if (isCreator) {
-      return TextButton(
-        onPressed: () => Navigator.pushNamed(context, '/project'),
-        child: const Text('Manage'),
-      );
-    } else {
-      return TextButton(
-        onPressed: () => _showLeaveProjectDialog(project),
-        style: TextButton.styleFrom(foregroundColor: Colors.red),
-        child: const Text('Leave'),
-      );
-    }
-  }
-
-  void _showLeaveProjectDialog(Map<String, dynamic> project) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Leave Project'),
-            content: Text(
-              'Are you sure you want to leave "${project['title']}"? You will need to request to rejoin if you change your mind.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await _leaveProject(project['id'].toString());
-                },
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Leave'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _leaveProject(String projectId) async {
-    try {
-      // Show loading indicator
-      setState(() => _isLoading = true);
-
-      _showSnackBar('Leaving project...', Colors.blue);
-
-      final response = await ApiService.leaveProject(projectId);
-
-      if (response['success']) {
-        _showSnackBar('Left project successfully', Colors.green);
-
-        // Remove from my projects list locally
-        setState(() {
-          _myProjects.removeWhere(
-            (project) => project['id'].toString() == projectId,
-          );
-        });
-      } else {
-        _showSnackBar(
-          response['error'] ?? 'Failed to leave project',
-          Colors.red,
-        );
-      }
-    } catch (e) {
-      _showSnackBar('Network error: $e', Colors.red);
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   Widget _buildProfileTab() {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
@@ -1011,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const SizedBox(height: 32),
 
                 // Remove Team Dashboard Button from profile tab since it's now in bottom nav
-                
+
                 // Profile Actions
                 _buildProfileAction(
                   icon: Icons.edit,
@@ -1442,46 +792,248 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildJoinedTeamsContent() {
-    if (_joinedTeams.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildProjectActionButton(Map<String, dynamic> project) {
+    // Determine user's role in this project
+    final currentUserId =
+        Provider.of<AuthProvider>(
+          context,
+          listen: false,
+        ).user?['id']?.toString();
+    final creatorId = project['creator_id']?.toString();
+    final isCreator = currentUserId == creatorId;
+
+    if (isCreator) {
+      return TextButton(
+        onPressed: () {
+          try {
+            Navigator.pushNamed(
+              context,
+              '/project',
+              arguments: project['id'].toString(),
+            );
+          } catch (e) {
+            print('Navigation error: $e');
+            _showSnackBar('Navigation error: $e', Colors.red);
+          }
+        },
+        child: const Text('Manage'),
+      );
+    } else {
+      return TextButton(
+        onPressed: () => _showLeaveProjectDialog(project),
+        style: TextButton.styleFrom(foregroundColor: Colors.red),
+        child: const Text('Leave'),
+      );
+    }
+  }
+
+  void _showLeaveProjectDialog(Map<String, dynamic> project) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Leave Project'),
+            content: Text(
+              'Are you sure you want to leave "${project['title']}"? You will need to request to rejoin if you change your mind.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _leaveProject(project['id'].toString());
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Leave'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _leaveProject(String projectId) async {
+    try {
+      // Show loading indicator
+      setState(() => _isLoading = true);
+
+      _showSnackBar('Leaving project...', Colors.blue);
+
+      final response = await ApiService.leaveProject(projectId);
+
+      if (response['success']) {
+        _showSnackBar('Left project successfully', Colors.green);
+
+        // Remove from my projects list locally
+        setState(() {
+          _myProjects.removeWhere(
+            (project) => project['id'].toString() == projectId,
+          );
+        });
+      } else {
+        _showSnackBar(
+          response['error'] ?? 'Failed to leave project',
+          Colors.red,
+        );
+      }
+    } catch (e) {
+      _showSnackBar('Network error: $e', Colors.red);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildMyProjectCard(Map<String, dynamic> project) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ListTile(
+        title: Text(project['title'] ?? 'Untitled Project'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.group, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            const Text('No joined teams yet'),
+            Text(project['description'] ?? 'No description'),
             const SizedBox(height: 8),
-            const Text(
-              'Join a project to become part of a team',
-              style: TextStyle(color: Colors.grey),
+            Wrap(
+              spacing: 6,
+              children:
+                  (project['required_skills'] as List<dynamic>? ?? [])
+                      .map(
+                        (skill) => Chip(
+                          label: Text(skill.toString()),
+                          backgroundColor: const Color(0xFFF3F4F6),
+                        ),
+                      )
+                      .toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Status: ${project['status'] ?? 'Unknown'}',
+              style: TextStyle(
+                color: _getStatusColor(project['status'] ?? ''),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Created: ${_formatDate(project['created_at'])}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
         ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadTeams,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _joinedTeams.length,
-        itemBuilder: (context, index) {
-          final team = _joinedTeams[index];
-          return _buildTeamCard(
-            team,
-            isCreator: false,
-            onTap: () => _navigateToTeamDetails(team['id']),
-          );
+        trailing: _buildProjectActionButton(project),
+        onTap: () {
+          try {
+            Navigator.pushNamed(
+              context,
+              '/project',
+              arguments: project['id'].toString(),
+            );
+          } catch (e) {
+            print('Navigation error: $e');
+            _showSnackBar('Navigation error: $e', Colors.red);
+          }
         },
       ),
     );
   }
 
+  Widget _buildProjectCard(Map<String, dynamic> project) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.user?['id']?.toString();
+    final creatorId = project['creator_id']?.toString();
+    final isCreator = currentUserId == creatorId;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ListTile(
+        title: Text(project['title'] ?? 'Untitled Project'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(project['description'] ?? 'No description'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              children:
+                  (project['required_skills'] as List<dynamic>? ?? [])
+                      .map(
+                        (skill) => Chip(
+                          label: Text(skill.toString()),
+                          backgroundColor: const Color(0xFFF3F4F6),
+                        ),
+                      )
+                      .toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Status: ${project['status'] ?? 'Unknown'}',
+              style: TextStyle(
+                color: _getStatusColor(project['status'] ?? ''),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Created: ${_formatDate(project['created_at'])}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            if (!isCreator)
+              ElevatedButton(
+                onPressed: () => _requestToJoinProject(project),
+                child: const Text('Request to Join'),
+              ),
+          ],
+        ),
+        onTap: () {
+          try {
+            Navigator.pushNamed(
+              context,
+              '/project',
+              arguments: project['id'].toString(),
+            );
+          } catch (e) {
+            print('Navigation error: $e');
+            _showSnackBar('Navigation error: $e', Colors.red);
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _requestToJoinProject(Map<String, dynamic> project) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user?['id']?.toString();
+
+    if (userId == null) {
+      _showSnackBar('Please log in to request to join a project.', Colors.red);
+      return;
+    }
+
+    try {
+      final response = await ApiService.joinProject(project['id'].toString());
+
+      if (response['success']) {
+        _showSnackBar(
+          'Request to join "${project['title']}" sent successfully!',
+          Colors.green,
+        );
+      } else {
+        _showSnackBar(
+          response['error'] ?? 'Failed to send request to join project',
+          Colors.red,
+        );
+      }
+    } catch (e) {
+      _showSnackBar('Network error: $e', Colors.red);
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
-    _teamTabController.dispose();
     super.dispose();
   }
 }

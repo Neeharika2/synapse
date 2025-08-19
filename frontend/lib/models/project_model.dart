@@ -51,38 +51,54 @@ class Project {
     // Process members data
     List<User> members = [];
     if (json['members'] != null && json['members'] is List) {
-      members =
-          (json['members'] as List)
-              .map((memberJson) => User.fromJson(memberJson))
-              .toList();
+      try {
+        members = (json['members'] as List)
+            .map((memberJson) => User.fromJson(memberJson))
+            .toList();
+      } catch (e) {
+        print('Error parsing members: $e');
+        members = [];
+      }
     }
 
     // Process required skills
     List<String> skills = [];
     if (json['required_skills'] != null) {
-      if (json['required_skills'] is List) {
-        skills =
-            (json['required_skills'] as List)
-                .map((skill) => skill.toString())
-                .toList();
-      } else if (json['required_skills'] is String) {
-        try {
+      try {
+        if (json['required_skills'] is List) {
+          skills = (json['required_skills'] as List)
+              .map((skill) => skill.toString())
+              .toList();
+        } else if (json['required_skills'] is String) {
           final parsed = jsonDecode(json['required_skills']);
           if (parsed is List) {
             skills = parsed.map((skill) => skill.toString()).toList();
           }
-        } catch (_) {
-          // If parsing fails, leave as empty list
         }
+      } catch (e) {
+        print('Error parsing required skills: $e');
+        skills = [];
       }
     }
 
     // Process pending requests
     List<JoinRequest> pendingRequests = [];
     if (json['pending_requests'] != null && json['pending_requests'] is List) {
-      pendingRequests = (json['pending_requests'] as List)
-          .map((requestJson) => JoinRequest.fromJson(requestJson))
-          .toList();
+      try {
+        pendingRequests = [];
+        for (var requestJson in json['pending_requests']) {
+          try {
+            pendingRequests.add(JoinRequest.fromJson(requestJson));
+          } catch (e) {
+            print('Error parsing individual join request: $e');
+            print('Problematic request data: $requestJson');
+          }
+        }
+      } catch (e) {
+        print('Error parsing pending requests: $e');
+        print('Pending requests data: ${json['pending_requests']}');
+        pendingRequests = [];
+      }
     }
 
     return Project(
@@ -94,14 +110,12 @@ class Project {
       maxMembers: json['max_members'] ?? 5,
       currentMembers: json['current_members'] ?? 0,
       visibility: json['visibility'] ?? 'public',
-      createdAt:
-          json['created_at'] != null
-              ? DateTime.parse(json['created_at'])
-              : DateTime.now(),
-      updatedAt:
-          json['updated_at'] != null
-              ? DateTime.parse(json['updated_at'])
-              : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at']) ?? DateTime.now()
+          : DateTime.now(),
       creator: creator,
       members: members,
       canLeave: json['can_leave'] ?? false,
@@ -148,20 +162,23 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id']?.toString() ?? '',
-      name: json['name'] ?? 'Unknown User',
-      email: json['email'] ?? '',
-      avatarUrl: json['avatar_url'],
-      createdAt:
-          json['created_at'] != null
-              ? DateTime.parse(json['created_at'])
-              : DateTime.now(),
-      updatedAt:
-          json['updated_at'] != null
-              ? DateTime.parse(json['updated_at'])
-              : DateTime.now(),
-    );
+    try {
+      return User(
+        id: json['id']?.toString() ?? '',
+        name: json['name'] ?? 'Unknown User',
+        email: json['email'] ?? '',
+        avatarUrl: json['avatar_url'],
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+            : DateTime.now(),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.tryParse(json['updated_at']) ?? DateTime.now()
+            : DateTime.now(),
+      );
+    } catch (e) {
+      print('Error parsing User: $e');
+      return User.empty();
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -188,31 +205,68 @@ class User {
 
 class JoinRequest {
   final String id;
+  final String projectId; // Added project ID field
   final User user;
   final String? message;
   final DateTime requestedAt;
 
   JoinRequest({
     required this.id,
+    required this.projectId, // Required project ID
     required this.user,
     this.message,
     required this.requestedAt,
   });
 
   factory JoinRequest.fromJson(Map<String, dynamic> json) {
-    return JoinRequest(
-      id: json['id'] ?? '',
-      user: User.fromJson(json['user'] ?? {}),
-      message: json['message'],
-      requestedAt: json['requested_at'] != null
-          ? DateTime.parse(json['requested_at'])
-          : DateTime.now(),
-    );
+    try {
+      // Handle different user data formats from backend
+      User user;
+      if (json.containsKey('user')) {
+        user = User.fromJson(json['user'] ?? {});
+      } else if (json.containsKey('user_id') && json.containsKey('user_name')) {
+        user = User(
+          id: json['user_id']?.toString() ?? '',
+          name: json['user_name'] ?? 'Unknown User',
+          email: json['user_email'] ?? '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        user = User.empty();
+      }
+
+      // Handle different date formats
+      DateTime requestedAt = DateTime.now();
+      if (json['requested_at'] != null) {
+        requestedAt = DateTime.tryParse(json['requested_at']) ?? DateTime.now();
+      } else if (json['created_at'] != null) {
+        requestedAt = DateTime.tryParse(json['created_at']) ?? DateTime.now();
+      }
+
+      return JoinRequest(
+        id: json['id']?.toString() ?? '',
+        projectId: json['project_id']?.toString() ?? '',
+        user: user,
+        message: json['message'],
+        requestedAt: requestedAt,
+      );
+    } catch (e) {
+      print('Error parsing JoinRequest: $e');
+      return JoinRequest(
+        id: json['id']?.toString() ?? '',
+        projectId: json['project_id']?.toString() ?? '',
+        user: User.empty(),
+        message: json['message'],
+        requestedAt: DateTime.now(),
+      );
+    }
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'project_id': projectId,
       'user': user.toJson(),
       'message': message,
       'requested_at': requestedAt.toIso8601String(),

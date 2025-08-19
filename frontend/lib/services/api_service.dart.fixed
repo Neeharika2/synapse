@@ -1,0 +1,38 @@
+  // Respond to a join request (accept/reject)
+  static Future<Map<String, dynamic>> respondToJoinRequest(
+    String projectId,
+    String requestId,
+    bool accept,
+  ) async {
+    try {
+      final action = accept ? 'accept' : 'reject';
+      print('🚀 ${action}ing join request: $requestId for project: $projectId');
+      print('📝 Request details - projectId: $projectId, requestId: $requestId, action: $action');
+
+      // Validate inputs to ensure they are not empty or malformed
+      if (projectId.isEmpty || requestId.isEmpty) {
+        print('❌ Invalid input: projectId or requestId is empty');
+        return {
+          'success': false,
+          'error': 'Invalid request: Missing project ID or request ID'
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse(
+              '$baseUrl/projects/$projectId/requests/$requestId/$action',
+            ),
+            headers: await getHeaders(),
+          )
+          .timeout(timeoutDuration);
+
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
+      return _handleResponse(response);
+    } catch (e) {
+      print('❌ Respond to join request error: $e');
+      return {'success': false, 'error': 'Failed to process join request: $e'};
+    }
+  }
