@@ -1,0 +1,102 @@
+/* Header component styles */
+.dashboard-header-wrapper {
+  background: var(--primary);
+  color: white;
+  padding: 0.5rem 0;
+}
+
+.dashboard-header {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.header-left .nav-logo {
+  margin: 0;
+  padding: 0;
+}
+
+.header-left h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: white;
+}
+
+.header-left p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+}
+
+.header-nav .main-nav {
+  background: transparent;
+  border: none;
+  margin: 0;
+}
+
+.header-nav .nav-container {
+  padding: 0;
+}
+
+.header-nav .nav-link {
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.5rem 1rem;
+}
+
+.header-nav .nav-link.active {
+  color: white;
+}
+
+.header-nav .nav-link.active::after {
+  background-color: white;
+}
+
+.header-nav .nav-link:hover {
+  color: white;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 992px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .header-nav {
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-nav .nav-links {
+    flex-wrap: wrap;
+  }
+}
