@@ -4,6 +4,31 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const router = express.Router();
 
+// Check if email exists
+router.post('/check-email', (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Query database to check if email exists
+    db.query('SELECT id FROM users WHERE email = ?', [email], (err, results) => {
+      if (err) {
+        console.error('Database error during email check:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      // Return result indicating whether email exists
+      return res.json({ exists: results.length > 0 });
+    });
+  } catch (error) {
+    console.error('Error checking email existence:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Register
 router.post('/register', async (req, res) => {
   try {
@@ -12,7 +37,7 @@ router.post('/register', async (req, res) => {
     // Check if user exists
     db.query('SELECT email FROM users WHERE email = ?', [email], async (err, results) => {
       if (err) return res.status(500).json({ error: 'Database error' });
-      if (results.length > 0) return res.status(400).json({ error: 'User already exists' });
+      if (results.length > 0) return res.status(409).json({ error: 'Email already exists' });
       
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);

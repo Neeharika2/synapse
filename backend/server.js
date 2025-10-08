@@ -22,12 +22,22 @@ const io = socketIo(server, {
   }
 });
 
+const emailAuthRoutes = require('./routes/emailAuth');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/auth', emailAuthRoutes);
 app.use('/api/auth', authRoutes);
+
+// Add a specific route for checking email
+app.use('/auth/check-email', (req, res, next) => {
+  req.url = '/check-email';
+  authRoutes(req, res, next);
+});
+
 app.use('/api/projects', projectRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/chat', chatRoutes);
