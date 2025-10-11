@@ -1674,3 +1674,30 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Add these styles to your components.css file */
+
+.project-tabs {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  background-color: #f5f5f5;
+  border: none;
+  padding: 10px 20px;
+  margin-right: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  background-color: #4a6cf7;
+  color: white;
+}
+
+.tab-button:hover:not(.active) {
+  background-color: #e0e0e0;
+}

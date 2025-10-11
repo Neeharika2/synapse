@@ -305,6 +305,22 @@ const Dashboard = ({ setToken }) => {
 
           {/* Main Content Area */}
           <div className="main-content">
+            {/* Add Project Tabs */}
+            <div className="project-tabs">
+              <button 
+                className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
+                onClick={() => setActiveTab('all')}
+              >
+                All Projects
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'my' ? 'active' : ''}`}
+                onClick={() => setActiveTab('my')}
+              >
+                My Projects
+              </button>
+            </div>
+            
             {showForm && (
               <form onSubmit={handleCreateProject} className="project-form animate-slideIn">
                 <div className="form-row">

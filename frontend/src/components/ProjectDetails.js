@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import Layout from './Layout';
 import '../styles/projectDetails.css';
 import '../styles/modals.css';
+import TasksTab from './project/TasksTab'; // Add this import at the top with other imports
 
 const ProjectDetails = ({ setToken }) => {
   const { projectId } = useParams();
@@ -634,69 +635,13 @@ const ProjectDetails = ({ setToken }) => {
                   </button>
                 </div>
                 
-                <div className="task-board">
-                  <div className="task-columns">
-                    <div className="task-column todo">
-                      <h3>To Do ({tasks.todo.length})</h3>
-                      <div className="tasks-list">
-                        {tasks.todo.map(task => (
-                          <div key={task.id} className="task-card">
-                            <h4>{task.title}</h4>
-                            {task.description && <p>{task.description}</p>}
-                            {task.assignee_name && (
-                              <div className="task-assignee">
-                                Assigned to: {task.assignee_name}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {tasks.todo.length === 0 && (
-                          <p className="no-tasks">No tasks in this column</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="task-column in-progress">
-                      <h3>In Progress ({tasks.in_progress.length})</h3>
-                      <div className="tasks-list">
-                        {tasks.in_progress.map(task => (
-                          <div key={task.id} className="task-card">
-                            <h4>{task.title}</h4>
-                            {task.description && <p>{task.description}</p>}
-                            {task.assignee_name && (
-                              <div className="task-assignee">
-                                Assigned to: {task.assignee_name}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {tasks.in_progress.length === 0 && (
-                          <p className="no-tasks">No tasks in this column</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="task-column done">
-                      <h3>Done ({tasks.done.length})</h3>
-                      <div className="tasks-list">
-                        {tasks.done.map(task => (
-                          <div key={task.id} className="task-card">
-                            <h4>{task.title}</h4>
-                            {task.description && <p>{task.description}</p>}
-                            {task.assignee_name && (
-                              <div className="task-assignee">
-                                Assigned to: {task.assignee_name}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {tasks.done.length === 0 && (
-                          <p className="no-tasks">No tasks in this column</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* Replace the task board with TasksTab component */}
+                <TasksTab 
+                  tasks={tasks}
+                  onCreateTask={handleCreateTask}
+                  onUpdateTask={handleUpdateTask}
+                  members={members}
+                />
 
                 {/* Task Creation Modal */}
                 {showTaskModal && (
@@ -928,3 +873,4 @@ const ProjectDetails = ({ setToken }) => {
 };
 
 export default ProjectDetails;
+                    

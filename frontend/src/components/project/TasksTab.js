@@ -2,38 +2,53 @@ import React, { useState } from 'react';
 import '../../styles/tasksTab.css';
 
 const TasksTab = ({ tasks, onCreateTask, onUpdateTask, members }) => {
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    status: 'todo',
-    assignedTo: '',
-    dueDate: ''
-  });
-  
   const [draggedTask, setDraggedTask] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   
-  const handleInputChange = (e) => {
+  const handleEditInputChange = (e) => {
     const { name, value } = e.target;
-    setNewTask(prev => ({
+    setEditingTask(prev => ({
       ...prev,
       [name]: value
     }));
   };
   
-  const handleSubmit = (e) => {
+  const handleEditSubmit = (e) => {
     e.preventDefault();
-    if (!newTask.title.trim()) return;
+    if (!editingTask.title.trim()) return;
     
-    onCreateTask(newTask);
+    // Format data to match what the backend expects
+    const taskData = {
+      title: editingTask.title,
+      description: editingTask.description,
+      status: editingTask.status,
+      assigned_to: editingTask.assignedTo || null, // Use assigned_to instead of assignedTo
+      due_date: editingTask.dueDate || null // Use due_date instead of dueDate
+    };
     
-    // Reset form
-    setNewTask({
-      title: '',
-      description: '',
-      status: 'todo',
-      assignedTo: '',
-      dueDate: ''
+    onUpdateTask(editingTask.id, taskData);
+    setShowEditModal(false);
+    setEditingTask(null);
+  };
+  
+  const openEditModal = (task) => {
+    setEditingTask({
+      ...task,
+      assignedTo: task.assigned_to || '',
+      dueDate: task.due_date || ''
     });
+    setShowEditModal(true);
+  };
+  
+  const handleStatusUpdate = (taskId, newStatus) => {
+    const taskToUpdate = Object.values(tasks)
+      .flat()
+      .find(task => task.id === taskId);
+    
+    if (taskToUpdate) {
+      onUpdateTask(taskId, { ...taskToUpdate, status: newStatus });
+    }
   };
   
   // Drag and drop handlers
@@ -73,82 +88,6 @@ const TasksTab = ({ tasks, onCreateTask, onUpdateTask, members }) => {
 
   return (
     <div className="tasks-tab">
-      <div className="task-form-container">
-        <h3>Add New Task</h3>
-        <form onSubmit={handleSubmit} className="task-form">
-          <div className="form-group">
-            <label htmlFor="title">Title*</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={newTask.title}
-              onChange={handleInputChange}
-              placeholder="Task title"
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="description">Description</label>
-            <textarea
-              id="description"
-              name="description"
-              value={newTask.description}
-              onChange={handleInputChange}
-              placeholder="Task description"
-              rows="3"
-            ></textarea>
-          </div>
-          
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="status">Status</label>
-              <select
-                id="status"
-                name="status"
-                value={newTask.status}
-                onChange={handleInputChange}
-              >
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="assignedTo">Assign To</label>
-              <select
-                id="assignedTo"
-                name="assignedTo"
-                value={newTask.assignedTo}
-                onChange={handleInputChange}
-              >
-                <option value="">Unassigned</option>
-                {members.map(member => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="dueDate">Due Date</label>
-              <input
-                type="date"
-                id="dueDate"
-                name="dueDate"
-                value={newTask.dueDate}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-          
-          <button type="submit" className="add-task-btn">Add Task</button>
-        </form>
-      </div>
-      
       <div className="task-board">
         {['todo', 'in_progress', 'done'].map(status => (
           <div 
@@ -189,6 +128,43 @@ const TasksTab = ({ tasks, onCreateTask, onUpdateTask, members }) => {
                       <span className="meta-value">{task.creator_name}</span>
                     </div>
                   </div>
+                  
+                  {/* Task actions */}
+                  <div className="task-actions">
+                    <button 
+                      className="edit-task-btn"
+                      onClick={() => openEditModal(task)}
+                    >
+                      Edit
+                    </button>
+                    
+                    <div className="status-actions">
+                      {status !== 'todo' && (
+                        <button 
+                          className="status-btn todo-btn"
+                          onClick={() => handleStatusUpdate(task.id, 'todo')}
+                        >
+                          To Do
+                        </button>
+                      )}
+                      {status !== 'in_progress' && (
+                        <button 
+                          className="status-btn progress-btn"
+                          onClick={() => handleStatusUpdate(task.id, 'in_progress')}
+                        >
+                          In Progress
+                        </button>
+                      )}
+                      {status !== 'done' && (
+                        <button 
+                          className="status-btn done-btn"
+                          onClick={() => handleStatusUpdate(task.id, 'done')}
+                        >
+                          Done
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
               
@@ -199,6 +175,97 @@ const TasksTab = ({ tasks, onCreateTask, onUpdateTask, members }) => {
           </div>
         ))}
       </div>
+      
+      {/* Edit Task Modal */}
+      {showEditModal && editingTask && (
+        <div className="modal-overlay">
+          <div className="edit-task-modal">
+            <h3>Edit Task</h3>
+            <form onSubmit={handleEditSubmit} className="task-form">
+              <div className="form-group">
+                <label htmlFor="edit-title">Title*</label>
+                <input
+                  type="text"
+                  id="edit-title"
+                  name="title"
+                  value={editingTask.title}
+                  onChange={handleEditInputChange}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="edit-description">Description</label>
+                <textarea
+                  id="edit-description"
+                  name="description"
+                  value={editingTask.description}
+                  onChange={handleEditInputChange}
+                  rows="3"
+                ></textarea>
+              </div>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="edit-status">Status</label>
+                  <select
+                    id="edit-status"
+                    name="status"
+                    value={editingTask.status}
+                    onChange={handleEditInputChange}
+                  >
+                    <option value="todo">To Do</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Done</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="edit-assignedTo">Assign To</label>
+                  <select
+                    id="edit-assignedTo"
+                    name="assignedTo"
+                    value={editingTask.assignedTo}
+                    onChange={handleEditInputChange}
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map(member => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="edit-dueDate">Due Date</label>
+                  <input
+                    type="date"
+                    id="edit-dueDate"
+                    name="dueDate"
+                    value={editingTask.dueDate}
+                    onChange={handleEditInputChange}
+                  />
+                </div>
+              </div>
+              
+              <div className="modal-actions">
+                <button type="submit" className="save-btn">Save Changes</button>
+                <button 
+                  type="button" 
+                  className="cancel-btn"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingTask(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

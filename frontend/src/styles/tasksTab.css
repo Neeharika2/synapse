@@ -108,6 +108,119 @@
   flex: 1;
 }
 
+/* Add these styles to your existing tasksTab.css file */
+
+.task-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.edit-task-btn {
+  background-color: #5379fa;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.edit-task-btn:hover {
+  background-color: #3a5bcc;
+}
+
+.status-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.status-btn {
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: white;
+}
+
+.todo-btn {
+  background-color: #6c757d;
+}
+
+.progress-btn {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.done-btn {
+  background-color: #28a745;
+}
+
+.todo-btn:hover { background-color: #5a6268; }
+.progress-btn:hover { background-color: #e0a800; }
+.done-btn:hover { background-color: #218838; }
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.edit-task-modal {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.save-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background-color: #218838;
+}
+
+.cancel-btn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background-color: #5a6268;
+}
+
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .task-columns {
